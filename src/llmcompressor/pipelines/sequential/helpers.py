@@ -11,6 +11,7 @@ from compressed_tensors.utils import (
     offloaded_dispatch,
     remove_dispatch,
 )
+from accelerate.utils import infer_auto_device_map
 from loguru import logger
 from torch.fx import Graph, GraphModule, Node
 from torch.fx.graph import PythonCode
@@ -530,7 +531,11 @@ def dispatch_for_sequential(
     remove_dispatch(model)
 
     if torch.cuda.is_available():
-        offloaded_dispatch(model, execution_device=execution_device)
+        if execution_device == "auto":
+            device_map = infer_auto_device_map(model)
+            offloaded_dispatch(model, device_map=device_map)
+        else:
+            offloaded_dispatch(model, execution_device=execution_device)
     else:
         logger.warning("CUDA is not available! Compressing model on CPU instead")
 
