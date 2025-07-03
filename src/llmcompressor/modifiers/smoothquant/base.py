@@ -330,8 +330,18 @@ class SmoothQuantModifier(Modifier):
         weight_scales = []
         for layer in balance_layers:
             with align_module_device(layer):
-                scale = layer.weight.abs().max(dim=0, keepdim=True)[0]
-                weight_scales.append(scale)
+                weight = layer.weight
+                num_rows = weight.shape[0]
+                chunk_size = 1024  # Process in chunks to reduce peak memory
+                max_vals = None
+                for i in range(0, num_rows, chunk_size):
+                    chunk = weight[i : i + chunk_size, :]
+                    chunk_max = chunk.abs().max(dim=0, keepdim=True)[0]
+                    if max_vals is None:
+                        max_vals = chunk_max
+                    else:
+                        max_vals = torch.max(max_vals, chunk_max)
+                weight_scales.append(max_vals)
 
         weight_scales = 2.0 * torch.cat(weight_scales, dim=0).max(dim=0)[0]
 
