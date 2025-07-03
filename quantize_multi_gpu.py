@@ -13,12 +13,7 @@ NUM_CALIBRATION_SAMPLES = 128
 MAX_SEQUENCE_LENGTH = 64
 
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_ID,
-    torch_dtype="auto",
-    trust_remote_code=True,
-    device_map="auto",
-    offload_folder="./offload",
-    max_memory={i: "22GiB" for i in range(torch.cuda.device_count())},
+    MODEL_ID, torch_dtype="auto", trust_remote_code=True
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
@@ -53,7 +48,7 @@ oneshot(
     max_seq_length=MAX_SEQUENCE_LENGTH,
     num_calibration_samples=NUM_CALIBRATION_SAMPLES,
     trust_remote_code_model=True,
-    pipeline="basic"
+    sequential_targets=["re:.*self_attn", "re:.*mlp"],
 )
 
 # Save the compressed model
