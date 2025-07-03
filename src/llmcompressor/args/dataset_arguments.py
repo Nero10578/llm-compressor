@@ -204,6 +204,10 @@ class DatasetArguments(CustomDatasetArguments):
             "Can be 'auto', 'cpu', 'cuda:0', etc."
         },
     )
+    offload_dir: Optional[str] = field(
+        default=None,
+        metadata={"help": "Directory to offload model layers to during dispatch."},
+    )
     sequential_targets: Optional[List[str]] = field(
         default=None,
         metadata={

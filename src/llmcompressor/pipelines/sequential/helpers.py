@@ -519,7 +519,9 @@ def get_sequential_ancestors(model: Module, targets: Set[Module]) -> Set[Module]
 
 
 def dispatch_for_sequential(
-    model: PreTrainedModel, execution_device: Any = "cuda:0"
+    model: PreTrainedModel,
+    execution_device: Any = "cuda:0",
+    offload_dir: Optional[str] = None,
 ) -> PreTrainedModel:
     """
     Dispatch a model for sequential calibration using a sequential pipeline.
@@ -537,7 +539,7 @@ def dispatch_for_sequential(
             device_map = infer_auto_device_map(
                 model, no_split_module_classes=no_split_module_classes
             )
-            dispatch_model(model, device_map=device_map)
+            dispatch_model(model, device_map=device_map, offload_dir=offload_dir)
         else:
             offloaded_dispatch(model, execution_device=execution_device)
     else:
