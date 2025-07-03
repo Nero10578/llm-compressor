@@ -17,7 +17,7 @@ model = AutoModelForCausalLM.from_pretrained(
     torch_dtype="auto",
     trust_remote_code=True,
     device_map="auto",
-    offload_folder="offload",
+    offload_folder="./offload",
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
