@@ -327,23 +327,27 @@ class SmoothQuantModifier(Modifier):
         :return: channel-wise scales to use for smoothing activations
         """
         # get the channel-wise dynamic range for each layer to be balanced
+        device = activation_scales.device
         weight_scales = []
         for layer in balance_layers:
-            with align_module_device(layer):
-                weight = layer.weight
-                num_rows = weight.shape[0]
-                chunk_size = 1024  # Process in chunks to reduce peak memory
-                max_vals = None
-                for i in range(0, num_rows, chunk_size):
-                    chunk = weight[i : i + chunk_size, :]
-                    chunk_max = chunk.abs().max(dim=0, keepdim=True)[0]
-                    if max_vals is None:
-                        max_vals = chunk_max
-                    else:
-                        max_vals = torch.max(max_vals, chunk_max)
-                weight_scales.append(max_vals)
+            weight = layer.weight
+            num_rows = weight.shape[0]
+            chunk_size = 1024  # Process in chunks to reduce peak memory
+            max_vals_cpu = None
+            for i in range(0, num_rows, chunk_size):
+                chunk = weight[i : i + chunk_size, :]
+                chunk_on_gpu = chunk.to(device)
+                chunk_max = chunk_on_gpu.abs().max(dim=0, keepdim=True)[0]
+                chunk_max_cpu = chunk_max.to("cpu")
+                if max_vals_cpu is None:
+                    max_vals_cpu = chunk_max_cpu
+                else:
+                    max_vals_cpu = torch.max(max_vals_cpu, chunk_max_cpu)
+            weight_scales.append(max_vals_cpu)
 
-        weight_scales = 2.0 * torch.cat(weight_scales, dim=0).max(dim=0)[0]
+        weight_scales_tensor = torch.cat(weight_scales, dim=0)
+        weight_scales_gpu = weight_scales_tensor.to(device)
+        weight_scales = 2.0 * weight_scales_gpu.max(dim=0)[0]
 
         # calculate the amount of smoothing to apply
         # s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha)
