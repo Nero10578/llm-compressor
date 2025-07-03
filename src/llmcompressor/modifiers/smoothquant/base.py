@@ -330,20 +330,22 @@ class SmoothQuantModifier(Modifier):
         device = activation_scales.device
         weight_scales = []
         for layer in balance_layers:
-            weight = layer.weight
-            num_rows = weight.shape[0]
-            chunk_size = 1024  # Process in chunks to reduce peak memory
-            max_vals_cpu = None
-            for i in range(0, num_rows, chunk_size):
-                chunk = weight[i : i + chunk_size, :]
-                chunk_on_gpu = chunk.to(device)
-                chunk_max = chunk_on_gpu.abs().max(dim=0, keepdim=True)[0]
-                chunk_max_cpu = chunk_max.to("cpu")
-                if max_vals_cpu is None:
-                    max_vals_cpu = chunk_max_cpu
-                else:
-                    max_vals_cpu = torch.max(max_vals_cpu, chunk_max_cpu)
-            weight_scales.append(max_vals_cpu)
+            # Materialize the layer's weights onto the CPU
+            with align_module_device(layer, device="cpu"):
+                weight = layer.weight
+                num_rows = weight.shape[0]
+                chunk_size = 1024  # Process in chunks to reduce peak memory
+                max_vals_cpu = None
+                for i in range(0, num_rows, chunk_size):
+                    chunk = weight[i : i + chunk_size, :]
+                    chunk_on_gpu = chunk.to(device)
+                    chunk_max = chunk_on_gpu.abs().max(dim=0, keepdim=True)[0]
+                    chunk_max_cpu = chunk_max.to("cpu")
+                    if max_vals_cpu is None:
+                        max_vals_cpu = chunk_max_cpu
+                    else:
+                        max_vals_cpu = torch.max(max_vals_cpu, chunk_max_cpu)
+                weight_scales.append(max_vals_cpu)
 
         weight_scales_tensor = torch.cat(weight_scales, dim=0)
         weight_scales_gpu = weight_scales_tensor.to(device)
