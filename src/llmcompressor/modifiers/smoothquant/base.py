@@ -330,14 +330,17 @@ class SmoothQuantModifier(Modifier):
         device = activation_scales.device
         weight_scales = []
         for layer in balance_layers:
-            # Materialize the layer's weights onto the CPU
-            with align_module_device(layer, device="cpu"):
-                weight = layer.weight
-                num_rows = weight.shape[0]
-                chunk_size = 1024  # Process in chunks to reduce peak memory
+            with align_module_device(layer):
+                # First, move the entire weight tensor to CPU. This is the step
+                # that should trigger materialization without causing GPU OOM.
+                weight_on_cpu = layer.weight.to("cpu")
+
+                # Now, perform the chunked processing as before.
+                num_rows = weight_on_cpu.shape[0]
+                chunk_size = 1024
                 max_vals_cpu = None
                 for i in range(0, num_rows, chunk_size):
-                    chunk = weight[i : i + chunk_size, :]
+                    chunk = weight_on_cpu[i : i + chunk_size, :]
                     chunk_on_gpu = chunk.to(device)
                     chunk_max = chunk_on_gpu.abs().max(dim=0, keepdim=True)[0]
                     chunk_max_cpu = chunk_max.to("cpu")
