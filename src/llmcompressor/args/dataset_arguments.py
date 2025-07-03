@@ -197,6 +197,13 @@ class DatasetArguments(CustomDatasetArguments):
             "{module}.{method_name} or {function_name}"
         },
     )
+    device: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Device to use for calibration. "
+            "Can be 'auto', 'cpu', 'cuda:0', etc."
+        },
+    )
     sequential_targets: Optional[List[str]] = field(
         default=None,
         metadata={
