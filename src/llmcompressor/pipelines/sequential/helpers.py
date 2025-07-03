@@ -117,10 +117,9 @@ def trace_subgraphs(
     # find modules
     targets = match_modules(model, sequential_targets)
     ancestors = get_sequential_ancestors(model, targets)
-    offloaded = set(m for m in model.modules() if has_offloaded_params(m))
 
     # initialize arguments
-    tracer = SequentialTracer(ancestors, offloaded)
+    tracer = SequentialTracer(model, ancestors)
     concrete_args = populate_concrete_args(model, sample_input)
 
     with contextlib.ExitStack() as stack:
@@ -179,27 +178,16 @@ class SequentialTracer(HFTracer):
     Tracing within sequential targets is unnecessary, and tracing within offloaded
     modules may result in meta tensors being added to the model graph
 
+    :param model: the model to trace, used to identify the top-level module
     :param ancestors: modules which are ancestors of sequential targets
-    :param offloaded: modules which have offloaded params and should not be traced
     """
 
-    def __init__(self, ancestors: Set[Module], offloaded: Set[Module]):
+    def __init__(self, model: Module, ancestors: Set[Module]):
+        self.model = model
         self.ancestors = ancestors
-        self.offloaded = offloaded
 
         # skip any mask creation functions not already caught by the autowrapper
         super().__init__(autowrap_functions=_get_autowrap_functions())
-
-        # check unlikely case that ancestors have direct params which are offloaded
-        offloaded_ancestors = offloaded & ancestors
-        if offloaded_ancestors:
-            names = set(module.__class__.__name__ for module in offloaded_ancestors)
-            logger.warning(
-                "The following modules are call graph ancestors of sequential targets,"
-                f"but also contain offloaded modules: {names}.\n"
-                "These modules will not be traced, and any sequential target children "
-                "will be executed jointly, which may lead to OOM errors"
-            )
 
     def create_arg(self, a: Any) -> Argument:
         # special extension allows models which depend on config values to be traced
@@ -211,8 +199,15 @@ class SequentialTracer(HFTracer):
             return super().create_arg(a)
 
     def is_leaf_module(self, module: Module, module_qualified_name: str) -> bool:
-        # do not trace non-ancestors or modules with offloaded params
-        return module not in self.ancestors or module in self.offloaded
+        # do not trace non-ancestors
+        if module not in self.ancestors:
+            return True
+
+        # treat any module with an accelerate hook as a leaf, except the top-level model
+        if hasattr(module, "_hf_hook") and module is not self.model:
+            return True
+
+        return False
 
 
 def populate_concrete_args(model: Module, sample_input: Dict) -> Dict:
