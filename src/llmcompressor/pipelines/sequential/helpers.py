@@ -540,7 +540,7 @@ def dispatch_for_sequential(
     if torch.cuda.is_available():
         if execution_device == "auto":
             n_gpu = torch.cuda.device_count()
-            max_memory = {i: "20GiB" for i in range(n_gpu)}
+            max_memory = {i: "16GiB" for i in range(n_gpu)}
             no_split_module_classes = get_no_split_params(model)
             device_map = infer_auto_device_map(
                 model,
