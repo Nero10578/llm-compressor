@@ -332,23 +332,29 @@ class SmoothQuantModifier(Modifier):
         compute_device = activation_scales.device
         for layer in balance_layers:
             # To handle very large layers, we calculate the max in chunks
-            # to avoid OOM errors.
+            # to avoid OOM errors. The weight for the layer may be on a different
+            # device so we perform the calculation on the source device and move the
+            # much smaller result to the compute_device
             weight = layer.weight
             num_rows = weight.shape[0]
             chunk_size = 1024  # Process 1024 rows at a time
             max_across_chunks = None
 
             for i in range(0, num_rows, chunk_size):
-                chunk = weight[i : i + chunk_size].to(compute_device)
+                chunk = weight[i : i + chunk_size]
                 chunk_max = chunk.abs().max(dim=0, keepdim=True)[0]
+                chunk_max_on_compute = chunk_max.to(compute_device)
                 if max_across_chunks is None:
-                    max_across_chunks = chunk_max
+                    max_across_chunks = chunk_max_on_compute
                 else:
-                    max_across_chunks = torch.max(max_across_chunks, chunk_max)
+                    max_across_chunks = torch.max(
+                        max_across_chunks, chunk_max_on_compute
+                    )
 
             weight_scales.append(max_across_chunks)
 
         weight_scales = 2.0 * torch.cat(weight_scales, dim=0).max(dim=0)[0]
+        weight_scales = weight_scales.to(activation_scales.device)
 
         # calculate the amount of smoothing to apply
         # s_j = max(|X_j|)^alpha / max(|W_j|)^(1-alpha)

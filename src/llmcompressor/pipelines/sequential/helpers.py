@@ -71,10 +71,19 @@ class Subgraph:
         forward_fn = self._code.globals.get("forward")
 
         try:
+            # find the model in the inputs to the subgraph forward pass
+            # the model may be a GraphModule or a PreTrainedModel
+            model = None
+            for arg in list(args) + list(kwargs.values()):
+                if isinstance(arg, GraphModule):
+                    model = arg.owning_module
+                    break
+                if isinstance(arg, PreTrainedModel):
+                    model = arg
+                    break
+
             # do not attempt to reshard the model when it is already sharded
-            with getattr(
-                args[0], "no_sync", lambda: contextlib.nullcontext()
-            )():
+            with getattr(model, "no_sync", lambda: contextlib.nullcontext())():
                 outputs = forward_fn(*args, **kwargs)
         except Exception as exception:
             raise RuntimeError(
