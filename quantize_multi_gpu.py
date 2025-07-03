@@ -48,7 +48,15 @@ oneshot(
     max_seq_length=MAX_SEQUENCE_LENGTH,
     num_calibration_samples=NUM_CALIBRATION_SAMPLES,
     trust_remote_code_model=True,
-    sequential_targets=["re:.*self_attn", "re:.*mlp"],
+    sequential_targets=[
+        "re:.*q_proj",
+        "re:.*k_proj",
+        "re:.*v_proj",
+        "re:.*o_proj",
+        "re:.*gate_proj",
+        "re:.*up_proj",
+        "re:.*down_proj",
+    ],
 )
 
 # Save the compressed model
