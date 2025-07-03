@@ -18,6 +18,7 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True,
     device_map="auto",
     offload_folder="./offload",
+    max_memory={i: "22GiB" for i in range(torch.cuda.device_count())},
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
