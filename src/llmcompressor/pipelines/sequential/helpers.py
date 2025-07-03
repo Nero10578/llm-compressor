@@ -516,7 +516,9 @@ def get_sequential_ancestors(model: Module, targets: Set[Module]) -> Set[Module]
     return ancestors
 
 
-def dispatch_for_sequential(model: PreTrainedModel) -> PreTrainedModel:
+def dispatch_for_sequential(
+    model: PreTrainedModel, execution_device: Any = "cuda:0"
+) -> PreTrainedModel:
     """
     Dispatch a model for sequential calibration using a sequential pipeline.
     The model will be offloaded to the CPU and dispatched to CUDA device if available.
@@ -528,7 +530,7 @@ def dispatch_for_sequential(model: PreTrainedModel) -> PreTrainedModel:
     remove_dispatch(model)
 
     if torch.cuda.is_available():
-        offloaded_dispatch(model, execution_device=torch.device("cuda:0"))
+        offloaded_dispatch(model, execution_device=execution_device)
     else:
         logger.warning("CUDA is not available! Compressing model on CPU instead")
 

@@ -53,7 +53,7 @@ class SequentialPipeline(CalibrationPipeline):
         session = active_session()
 
         # prepare model for sequential onloading
-        dispatch_for_sequential(model)
+        dispatch_for_sequential(model, execution_device=dataset_args.device)
         model_device = get_execution_device(model)
 
         # prepare to trace subgraphs
