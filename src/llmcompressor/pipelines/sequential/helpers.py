@@ -71,7 +71,11 @@ class Subgraph:
         forward_fn = self._code.globals.get("forward")
 
         try:
-            outputs = forward_fn(*args, **kwargs)
+            # do not attempt to reshard the model when it is already sharded
+            with getattr(
+                args[0], "no_sync", lambda: contextlib.nullcontext()
+            )():
+                outputs = forward_fn(*args, **kwargs)
         except Exception as exception:
             raise RuntimeError(
                 "Raised an exception during execution of the following code:\n"
