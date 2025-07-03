@@ -328,10 +328,25 @@ class SmoothQuantModifier(Modifier):
         """
         # get the channel-wise dynamic range for each layer to be balanced
         weight_scales = []
+        # use the device of the activation scales as the target for computation
+        compute_device = activation_scales.device
         for layer in balance_layers:
-            with align_module_device(layer):
-                scale = layer.weight.abs().max(dim=0, keepdim=True)[0]
-                weight_scales.append(scale)
+            # To handle very large layers, we calculate the max in chunks
+            # to avoid OOM errors.
+            weight = layer.weight
+            num_rows = weight.shape[0]
+            chunk_size = 1024  # Process 1024 rows at a time
+            max_across_chunks = None
+
+            for i in range(0, num_rows, chunk_size):
+                chunk = weight[i : i + chunk_size].to(compute_device)
+                chunk_max = chunk.abs().max(dim=0, keepdim=True)[0]
+                if max_across_chunks is None:
+                    max_across_chunks = chunk_max
+                else:
+                    max_across_chunks = torch.max(max_across_chunks, chunk_max)
+
+            weight_scales.append(max_across_chunks)
 
         weight_scales = 2.0 * torch.cat(weight_scales, dim=0).max(dim=0)[0]
 
