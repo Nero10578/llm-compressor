@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 import torch
 from compressed_tensors.quantization import find_name_or_class_matches
+from accelerate import dispatch_model
+from accelerate.utils import infer_auto_device_map
 from compressed_tensors.utils import (
     has_offloaded_params,
     offloaded_dispatch,
     remove_dispatch,
 )
-from accelerate.utils import infer_auto_device_map
 from loguru import logger
 from torch.fx import Graph, GraphModule, Node
 from torch.fx.graph import PythonCode
@@ -532,8 +533,11 @@ def dispatch_for_sequential(
 
     if torch.cuda.is_available():
         if execution_device == "auto":
-            device_map = infer_auto_device_map(model)
-            offloaded_dispatch(model, device_map=device_map)
+            no_split_module_classes = get_no_split_params(model)
+            device_map = infer_auto_device_map(
+                model, no_split_module_classes=no_split_module_classes
+            )
+            dispatch_model(model, device_map=device_map)
         else:
             offloaded_dispatch(model, execution_device=execution_device)
     else:
