@@ -54,7 +54,7 @@ class SequentialPipeline(CalibrationPipeline):
 
         # prepare model for sequential onloading
         dispatch_for_sequential(model)
-        model_device = get_execution_device(model)
+        model_device = "cpu"
 
         # prepare to trace subgraphs
         modifiers = session.lifecycle.recipe.modifiers

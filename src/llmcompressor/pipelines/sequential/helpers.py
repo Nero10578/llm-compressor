@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 import torch
 from compressed_tensors.quantization import find_name_or_class_matches
+from accelerate import dispatch_model, infer_auto_device_map
 from compressed_tensors.utils import (
     has_offloaded_params,
     offloaded_dispatch,
@@ -519,19 +520,29 @@ def get_sequential_ancestors(model: Module, targets: Set[Module]) -> Set[Module]
 def dispatch_for_sequential(model: PreTrainedModel) -> PreTrainedModel:
     """
     Dispatch a model for sequential calibration using a sequential pipeline.
-    The model will be offloaded to the CPU and dispatched to CUDA device if available.
+    The model will be offloaded to the CPU and dispatched to CUDA device(s) if available.
     Removes any existing hooks.
-
     :param model: model to dispatch
     :return: dispatched model
     """
     remove_dispatch(model)
-
     if torch.cuda.is_available():
-        offloaded_dispatch(model, execution_device=torch.device("cuda:0"))
+        if torch.cuda.device_count() > 1:
+            # get device map for multi-gpu execution
+            device_map = infer_auto_device_map(
+                model,
+                no_split_module_classes=get_no_split_params(model),
+                max_memory={
+                    i: torch.cuda.get_device_properties(i).total_memory
+                    for i in range(torch.cuda.device_count())
+                },
+            )
+            dispatch_model(model, device_map=device_map)
+        else:
+            # default to single gpu execution
+            offloaded_dispatch(model, execution_device=torch.device("cuda:0"))
     else:
         logger.warning("CUDA is not available! Compressing model on CPU instead")
-
     return model
 
 
