@@ -1,5 +1,6 @@
 import contextlib
 import inspect
+import tempfile
 from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
@@ -537,7 +538,8 @@ def dispatch_for_sequential(model: PreTrainedModel) -> PreTrainedModel:
                     for i in range(torch.cuda.device_count())
                 },
             )
-            dispatch_model(model, device_map=device_map)
+            with tempfile.TemporaryDirectory() as offload_dir:
+                dispatch_model(model, device_map=device_map, offload_dir=offload_dir)
         else:
             # default to single gpu execution
             offloaded_dispatch(model, execution_device=torch.device("cuda:0"))
