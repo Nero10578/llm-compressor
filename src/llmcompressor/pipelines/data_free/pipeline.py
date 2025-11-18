@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING, Optional
 
 import torch
+from compressed_tensors.utils import has_offloaded_params
 from torch.utils.data.dataloader import DataLoader
 
 from llmcompressor.core.session_functions import LifecycleCallbacks
 from llmcompressor.pipelines.registry import CalibrationPipeline
+from llmcompressor.pipelines.sequential.helpers import dispatch_for_sequential
 from llmcompressor.utils.dev import dispatch_for_generation
 
 if TYPE_CHECKING:
@@ -28,9 +30,15 @@ class DataFreePipeline(CalibrationPipeline):
         :param dataloader: loads data for calibration
         :param dataset_args: dataset arguments relevant to pipelines
         """
-        # some ops are still performed on the model by modifiers
-        # we want those ops to occur on the GPU
-        dispatch_for_generation(model)
+        # Check if model already has offloaded params (sequential dispatch)
+        # If so, keep the sequential dispatch setup
+        has_sequential_dispatch = any(
+            has_offloaded_params(module) for module in model.modules()
+        )
+        
+        if not has_sequential_dispatch:
+            # Standard behavior: dispatch for generation
+            dispatch_for_generation(model)
 
         LifecycleCallbacks.calibration_epoch_start()
         LifecycleCallbacks.calibration_epoch_end()
