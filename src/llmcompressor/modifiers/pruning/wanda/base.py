@@ -10,7 +10,7 @@ from loguru import logger
 from pydantic import PrivateAttr
 
 from llmcompressor.core import State
-from llmcompressor.modifiers.obcq.sgpt_base import SparsityModifierBase
+from llmcompressor.modifiers.pruning.sparsegpt.sgpt_base import SparsityModifierBase
 from llmcompressor.modifiers.pruning.wanda.wanda_sparsify import (
     accumulate_row_scalars,
     make_empty_row_scalars,
@@ -36,7 +36,7 @@ class WandaPruningModifier(SparsityModifierBase):
     Lifecycle:
         - on_initialize
             - register_hook(module, calibrate_module, "forward")
-            - run_sequential / run_layer_sequential / run_basic
+            - run_sequential / run_basic
                 - make_empty_row_scalars
                 - accumulate_row_scalars
         - on_sequential_batch_end

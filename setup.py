@@ -110,25 +110,42 @@ setup(
         "src", include=["llmcompressor", "llmcompressor.*"], exclude=["*.__pycache__.*"]
     ),
     install_requires=[
-        "loguru>=0.7.2",
-        "pyyaml>=5.0.0",
+        ("loguru>=0.7.2,<=0.7.3" if BUILD_TYPE == "release" else "loguru>=0.7.2"),
+        ("pyyaml>=6.0.1,<=6.0.3" if BUILD_TYPE == "release" else "pyyaml>=6.0.1"),
         # librosa dependency numba is currently not compatible with numpy>=2.3
         # https://numba.readthedocs.io/en/stable/user/installing.html#version-support-information
-        "numpy>=1.17.0,<2.3",
-        "requests>=2.0.0",
-        "tqdm>=4.0.0",
-        # torch 1.10 and 1.11 do not support quantized onnx export
-        "torch>=1.7.0,!=1.10,!=1.11",
-        "transformers>4.0",
-        "datasets>=3.0.0",
-        "accelerate>=0.20.3,!=1.1.0",
-        "pynvml>=11.5.3",
-        "pillow>=10.4.0",
+        ("numpy>=2.0.0,<=2.3.3" if BUILD_TYPE == "release" else "numpy>=2.0.0"),
         (
-            "compressed-tensors==0.10.2"
+            "requests>=2.32.2,<=2.32.5"
             if BUILD_TYPE == "release"
-            else "compressed-tensors>=0.10.3a2"
+            else "requests>=2.32.2"
         ),
+        ("tqdm>=4.66.3,<=4.67.1" if BUILD_TYPE == "release" else "tqdm>=4.66.3"),
+        ("torch>=2.7.0,<=2.8.0" if BUILD_TYPE == "release" else "torch>=2.7.0"),
+        (
+            "transformers>=4.54.0,<=4.56.2"
+            if BUILD_TYPE == "release"
+            else "transformers>=4.54.0"
+        ),
+        ("datasets>=4.0.0,<=4.1.1" if BUILD_TYPE == "release" else "datasets>=4.0.0"),
+        (
+            "accelerate>=1.6.0,<=1.10.1"
+            if BUILD_TYPE == "release"
+            else "accelerate>=1.6.0"
+        ),
+        (
+            "nvidia-ml-py>=12.560.30,<=13.580.82"
+            if BUILD_TYPE == "release"
+            else "nvidia-ml-py>=12.560.30"
+        ),
+        ("pillow>=10.4.0,<=11.3.0" if BUILD_TYPE == "release" else "pillow>=10.4.0"),
+        (
+            "compressed-tensors==0.12.2"
+            if BUILD_TYPE == "release"
+            else "compressed-tensors>=0.12.3a2"
+        ),
+        # TODO: replace it with the release version
+        ("auto_round @ git+https://github.com/intel/auto-round.git@llmc"),
     ],
     extras_require={
         "dev": [
@@ -136,23 +153,19 @@ setup(
             "pytest>=6.0.0",
             "pytest-mock>=3.6.0",
             "pytest-rerunfailures>=13.0",
-            "parameterized",
-            "lm_eval==0.4.5",
+            "lm_eval==0.4.9",
             # test dependencies
             "beautifulsoup4~=4.12.3",
-            "cmarkgfm~=2024.1.14",
+            "cmarkgfm>=2024.1.14",
             "trl>=0.10.1",
             "pandas<2.3.0",
             "torchvision",
-            "librosa",
+            "librosa==0.11.0",
             "soundfile",
             "torchcodec",
             # linting, formatting, and type checking
-            "black~=24.4.2",
-            "isort~=5.13.2",
             "mypy~=1.10.0",
             "ruff~=0.4.8",
-            "flake8~=7.0.0",
             # pre commit hooks
             "pre-commit",
             # docs
@@ -173,7 +186,7 @@ setup(
             "llmcompressor.trace=llmcompressor.transformers.tracing.debug:main",
         ]
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Programming Language :: Python :: 3",

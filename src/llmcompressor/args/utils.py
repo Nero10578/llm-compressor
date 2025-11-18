@@ -1,4 +1,11 @@
-from typing import Tuple
+"""
+Utility functions for parsing and processing argument classes.
+
+Provides helper functions for parsing command-line arguments and
+configuration dictionaries into structured argument dataclasses used in
+LLM compression workflows. Handles argument validation, deprecation
+warnings, and processor resolution.
+"""
 
 from loguru import logger
 from transformers import HfArgumentParser
@@ -14,7 +21,13 @@ from llmcompressor.transformers.utils.helpers import resolve_processor_from_mode
 
 def parse_args(
     include_training_args: bool = False, **kwargs
-) -> Tuple[ModelArguments, DatasetArguments, RecipeArguments, TrainingArguments, str]:
+) -> tuple[
+    ModelArguments,
+    DatasetArguments,
+    RecipeArguments,
+    TrainingArguments | None,
+    str | None,
+]:
     """
     Keyword arguments passed in from `oneshot` or `train` will
     separate the arguments into the following:
@@ -61,7 +74,7 @@ def parse_args(
 
     # raise depreciation warnings
     if dataset_args.remove_columns is not None:
-        logger.warn(
+        logger.warning(
             "`remove_columns` argument is depreciated. When tokenizing datasets, all "
             "columns which are invalid inputs the tokenizer will be removed",
             DeprecationWarning,
