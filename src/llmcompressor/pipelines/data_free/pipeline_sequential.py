@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 __all__ = ["SequentialDataFreePipeline"]
 
 
-@CalibrationPipeline.register("sequential_datafree")
+@CalibrationPipeline.register("datafree_sequential")
 class SequentialDataFreePipeline(CalibrationPipeline):
     @staticmethod
     def __call__(

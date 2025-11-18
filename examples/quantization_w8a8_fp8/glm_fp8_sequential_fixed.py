@@ -30,12 +30,12 @@ recipe = QuantizationModifier(
 )
 
 # Apply FP8 quantization with sequential offloading
-# The pipeline="sequential_datafree" parameter enables sequential offloading
+# The pipeline="datafree_sequential" parameter enables sequential offloading
 # without requiring a calibration dataset
 oneshot(
     model=model,
     recipe=recipe,
-    pipeline="sequential_datafree",  # Use the new sequential data-free pipeline
+    pipeline="datafree_sequential",  # Use the new sequential data-free pipeline
 )
 
 # Save quantized model
