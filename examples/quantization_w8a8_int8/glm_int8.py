@@ -149,7 +149,7 @@ IGNORE_LIST = [
 
 # Configure algorithms
 recipe = [
-    SmoothQuantModifier(smoothing_strength=0.8),
+    SmoothQuantModifier(smoothing_strength=0.8, ignore=IGNORE_LIST),
     GPTQModifier(targets="Linear", scheme="W8A8", ignore=IGNORE_LIST),
 ]
 
