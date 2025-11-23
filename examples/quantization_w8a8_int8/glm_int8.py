@@ -1,25 +1,53 @@
 """
-FP8 quantization with sequential offloading for GLM-4.5-Air MoE model.
-This uses the new SequentialDataFreePipeline to enable sequential offloading
-without requiring a calibration dataset.
-
-Uses the exact same ignore list as the original working model.
+INT8 quantization (W8A8) for GLM-4.5-Air MoE model using GPTQ and SmoothQuant.
 """
+from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from llmcompressor import oneshot
-from llmcompressor.modifiers.quantization import QuantizationModifier
-from compressed_tensors.quantization import QuantizationArgs, QuantizationScheme
+from llmcompressor.modifiers.quantization import GPTQModifier
+from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
 
 MODEL_ID = "/home/arli/models/GLM-4.5-Air-Abliterated"
 
-# Load model to CPU
+# Load model
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_ID, 
-    torch_dtype="auto", 
-    device_map=None  # Critical: loads to CPU for sequential offloading
+    MODEL_ID,
+    torch_dtype="auto",
+    device_map=None,
 )
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+
+# Select calibration dataset.
+DATASET_ID = "HuggingFaceH4/ultrachat_200k"
+DATASET_SPLIT = "train_sft"
+NUM_CALIBRATION_SAMPLES = 512
+MAX_SEQUENCE_LENGTH = 2048
+
+# Load dataset and preprocess.
+ds = load_dataset(DATASET_ID, split=f"{DATASET_SPLIT}[:{NUM_CALIBRATION_SAMPLES}]")
+ds = ds.shuffle(seed=42)
+
+def preprocess(example):
+    return {
+        "text": tokenizer.apply_chat_template(
+            example["messages"],
+            tokenize=False,
+        )
+    }
+
+ds = ds.map(preprocess)
+
+def tokenize(sample):
+    return tokenizer(
+        sample["text"],
+        padding=False,
+        max_length=MAX_SEQUENCE_LENGTH,
+        truncation=True,
+        add_special_tokens=False,
+    )
+
+ds = ds.map(tokenize, remove_columns=ds.column_names)
 
 # Exact ignore list from the original working model
 IGNORE_LIST = [
@@ -119,39 +147,23 @@ IGNORE_LIST = [
     "model.layers.23.self_attn.q_proj.bias"
 ]
 
-recipe = QuantizationModifier(
-    config_groups={
-        "group_0": QuantizationScheme(
-            targets=["Linear"],
-            input_activations=QuantizationArgs(
-                num_bits=8,
-                type="float",
-                symmetric=True,
-                dynamic=True,
-                strategy="token",
-            ),
-            weights=QuantizationArgs(
-                num_bits=8,
-                type="float",
-                symmetric=True,
-                dynamic=False,
-                strategy="channel",
-                observer="minmax",
-            ),
-        )
-    },
-    ignore=IGNORE_LIST,
-)
+# Configure algorithms
+recipe = [
+    SmoothQuantModifier(smoothing_strength=0.8),
+    GPTQModifier(targets="Linear", scheme="W8A8", ignore=IGNORE_LIST),
+]
 
-# Apply FP8 quantization with sequential offloading
+# Apply algorithms
 oneshot(
     model=model,
+    dataset=ds,
     recipe=recipe,
-    pipeline="sequential_datafree",  # Use the new sequential data-free pipeline
+    max_seq_length=MAX_SEQUENCE_LENGTH,
+    num_calibration_samples=NUM_CALIBRATION_SAMPLES,
 )
 
 # Save quantized model
-SAVE_DIR = MODEL_ID + "-FP8"
+SAVE_DIR = MODEL_ID + "-W8A8-Dynamic-Per-Token"
 model.save_pretrained(SAVE_DIR, save_compressed=True)
 tokenizer.save_pretrained(SAVE_DIR)
 
