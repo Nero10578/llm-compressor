@@ -2,7 +2,6 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from llmcompressor import oneshot
-from llmcompressor.modifiers.quantization import GPTQModifier
 
 # 1. Configuration
 MODEL_ID = "/home/arli/models/GLM-4.6-Derestricted" # Or your specific GLM ID
@@ -45,32 +44,35 @@ def tokenize(sample):
 
 ds = ds.map(tokenize, remove_columns=ds.column_names)
 
-# 4. Define Ignore Rules (Based on your JSON config)
-# We use "re:" prefix to tell llmcompressor to treat strings as regex
-ignores = [
-    # --- Standard Excludes (-:) ---
-    "lm_head",
-    "model.embed_tokens",
-    r"re:.*shared_experts.*",  # Regex for all shared experts
-    r"re:.*shared_head.*",     # Regex for shared head
-    r"re:.*self_attn.*",
-    
-    # --- Mixed Precision Layers (+:) ---
-    # The config sets layers 0-4 and 44-46 to FP16.
-    # We ignore them here to keep them at FP16 (safest for W4A16 recipe).
-    # [0-4] matches 0,1,2,3,4
-    # 8[8-9]|9[0-2] matches 88,89,90,91,92
-    r"re:model\.layers\.(?:[0-3]|89|9[0-2])\..*",
-]
+# 4. Configure Mixed Precision Int4/Int8 Recipe
+# This applies int8 to previously ignored layers (except lm_head), int4 to everything else
+recipe = """
+quant_stage:
+    quant_modifiers:
+        GPTQModifier:
+            ignore: ["lm_head"]
+            config_groups:
+                group_0:
+                    weights:
+                        num_bits: 8
+                        type: int
+                        strategy: group
+                        dynamic: false
+                        symmetric: true
+                        group_size: 128
+                    targets: ["model.embed_tokens", "re:.*shared_experts.*proj.*", "re:.*self_attn.(q|k|v|o)_proj.*", "re:.*layers.[0-3].*proj.*", "re:.*layers.89.*proj.*", "re:.*layers.9[0-2].*proj.*"]
+                group_1:
+                    weights:
+                        num_bits: 4
+                        type: int
+                        strategy: group
+                        dynamic: false
+                        symmetric: false
+                        group_size: 128
+                    targets: ["Linear"]
+"""
 
-# 5. Configure GPTQ Recipe
-recipe = GPTQModifier(
-    targets="Linear",
-    scheme="W4A16",        # 4-bit Weights, 16-bit Activations
-    ignore=ignores,
-)
-
-# 6. Apply Quantization
+# 5. Apply Mixed Precision Quantization
 # sequential_targets=["GLMBlock"] ensures we only load one layer block onto
 # the GPU at a time to save VRAM.
 oneshot(
@@ -81,8 +83,8 @@ oneshot(
     num_calibration_samples=NUM_CALIBRATION_SAMPLES
 )
 
-# 7. Save Compressed Model
-SAVE_DIR = MODEL_ID + "-GPTQ-W4A16"
+# 6. Save Compressed Model
+SAVE_DIR = MODEL_ID + "-GPTQ-INT4-INT8-Mixed"
 model.save_pretrained(SAVE_DIR, save_compressed=True)
 tokenizer.save_pretrained(SAVE_DIR)
 
